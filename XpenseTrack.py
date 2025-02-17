@@ -41,6 +41,7 @@ class user_info(db.Model, UserMixin):
     name = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(200), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+    join_date = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
         return f"<user_info(id={self.id}, name='{self.name}', email='{self.email}')>"
@@ -124,8 +125,19 @@ def dashboard():
     current_month = datetime.now().month
     current_year = datetime.now().year
 
+    # Fetch recent expenses for the current month
     expenses = (
         Transaction.query.filter_by(user_id=current_user.id, type="expense")
+        .filter(db.extract("month", Transaction.date) == current_month)
+        .filter(db.extract("year", Transaction.date) == current_year)
+        .order_by(Transaction.date.desc())
+        .limit(10)
+        .all()
+    )
+
+    # Fetch recent incomes for the current month
+    incomes = (
+        Transaction.query.filter_by(user_id=current_user.id, type="income")
         .filter(db.extract("month", Transaction.date) == current_month)
         .filter(db.extract("year", Transaction.date) == current_year)
         .order_by(Transaction.date.desc())
@@ -143,15 +155,28 @@ def dashboard():
         or 0
     )
 
+    # Calculate total income for the current month
+    monthly_income = (
+        db.session.query(db.func.sum(Transaction.amount))
+        .filter_by(user_id=current_user.id, type="income")
+        .filter(db.extract("month", Transaction.date) == current_month)
+        .filter(db.extract("year", Transaction.date) == current_year)
+        .scalar()
+        or 0
+    )
+
+    # Calculate balance (Income - Expenses)
+    balance = monthly_income - monthly_expenses
+
     return render_template(
         "dashboard.html",
         user=current_user,
+        monthly_income=monthly_income,
         monthly_expenses=monthly_expenses,
+        balance=balance,
         expenses=expenses,
+        incomes=incomes,
     )
-
-
-from datetime import datetime
 
 
 @app.route("/add_expense", methods=["POST"])
@@ -194,7 +219,36 @@ def add_expense():
     return redirect(url_for("dashboard"))
 
 
-from datetime import datetime
+@app.route("/add_income", methods=["POST"])
+@login_required
+def add_income():
+    date = request.form.get("date")
+    source = request.form.get("source")
+    amount = request.form.get("amount")
+
+    if not date or not source or not amount:
+        flash("All fields are required!", "danger")
+        return redirect(url_for("dashboard"))
+
+    try:
+        amount = float(amount)
+    except ValueError:
+        flash("Invalid amount!", "danger")
+        return redirect(url_for("dashboard"))
+
+    new_income = Transaction(
+        user_id=current_user.id,
+        date=datetime.strptime(date, "%Y-%m-%d"),
+        category=source,  # Use 'category' field to store source
+        description="Income",
+        amount=amount,
+        type="income",
+    )
+    db.session.add(new_income)
+    db.session.commit()
+
+    flash("Income added successfully!", "success")
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/edit_expense/<int:id>", methods=["GET", "POST"])
@@ -228,9 +282,7 @@ def edit_expense(id):
             return redirect(url_for("edit_expense", id=id))
 
         try:
-            expense.date = datetime.strptime(
-                date_str, "%Y-%m-%d"
-            ).date()
+            expense.date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
             flash("Invalid date format!", "danger")
             return redirect(url_for("edit_expense", id=id))

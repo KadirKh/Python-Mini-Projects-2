@@ -12,6 +12,7 @@
 
                     <p><strong>Name:</strong> {{ user.name }}</p>
                     <p><strong>Email:</strong> {{ user.email }}</p>
+                    <p><strong>Joined:</strong> {{ user.join_date.strftime('%B %d, %Y') }}</p>
 
                     <!-- Expense Summary -->
                     <hr class="bg-light">
@@ -21,6 +22,8 @@
                     <p><strong>Balance:</strong> ₹{{ balance }}</p>
 
                     <!-- Profile Actions -->
+                    <a href="{{ url_for('edit_profile') }}" class="btn btn-outline-secondary btn-sm mt-2">Edit
+                        Profile</a>
                     <a href="{{ url_for('change_password') }}" class="btn btn-outline-primary btn-sm mt-2">Change
                         Password</a>
                     <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm mt-2">Logout</a>
