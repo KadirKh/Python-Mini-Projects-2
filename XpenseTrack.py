@@ -247,7 +247,7 @@ def add_income():
     db.session.add(new_income)
     db.session.commit()
 
-    flash("Income added successfully!", "success")
+    # flash("Income added successfully!", "success")
     return redirect(url_for("dashboard"))
 
 
