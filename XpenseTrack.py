@@ -239,7 +239,7 @@ def add_income():
     new_income = Transaction(
         user_id=current_user.id,
         date=datetime.strptime(date, "%Y-%m-%d"),
-        category=source,  
+        category=source,
         description="Income",
         amount=amount,
         type="income",
